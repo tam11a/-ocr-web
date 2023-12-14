@@ -1,59 +1,79 @@
 import React from "react";
-import { Upload } from "antd";
+import { Collapse, Skeleton, Tag, Upload } from "antd";
 import { TbDragDrop } from "react-icons/tb";
 const { Dragger } = Upload;
-import type { UploadProps } from "antd";
+import type { CollapseProps, UploadProps } from "antd";
 import Tesseract from "tesseract.js";
 
 const DragZone: React.FC = () => {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const [data, setData] = React.useState<any[]>([]);
+	const [data, setData] = React.useState<CollapseProps["items"]>([]);
+	const [totalLoading, setTotalLoading] = React.useState(0);
+
 	const props: UploadProps = {
 		name: "file",
 		multiple: true,
-		customRequest: async (info) => {
-			const { file } = info;
-			console.log(info);
+		showUploadList: false,
+		beforeUpload: (file) => {
+			setTotalLoading((totalLoading) => totalLoading + 1);
 			Tesseract.recognize(file as File, "eng+ben").then(function (result) {
-				console.log(result?.data);
-				setData((data) => [...data, result?.data]);
+				setData((data) => [
+					...(data ? data : []),
+					{
+						key: file.uid,
+						label: (
+							<>
+								{file.name}{" "}
+								<Tag color={result?.data?.confidence > 90 ? "green" : "error"}>
+									{result?.data?.confidence}%
+								</Tag>
+							</>
+						),
+						children: (
+							<div
+								dangerouslySetInnerHTML={{
+									__html: result?.data?.hocr || "",
+								}}
+							/>
+						),
+					},
+				]);
+				setTotalLoading((totalLoading) => totalLoading - 1);
 			});
-			return true;
-		},
-		// action: "https://run.mocky.io/v3/435e224c-44fb-4773-9faf-380c5e6a2188",
-		// onChange: async (info) => {
-		// 	const { file } = info;
-		// Tesseract.recognize(file as File, "eng+ben").then(function (result) {
-		// 	console.log(result);
-		// });
-		// console.log(await convert2png(file.originFileObj));
-		// },
-		onDrop() {
-			setData([]);
+			return false;
 		},
 	};
 	return (
 		<>
-			<Dragger {...props}>
-				<p className="ant-upload-drag-icon text-6xl text-slate-500 flex flex-row items-center justify-center">
-					<TbDragDrop />
-				</p>
-				<p className="ant-upload-text">
-					Click or drag file to this area to upload
-				</p>
-				<p className="ant-upload-hint">
-					Support for a single or bulk upload. Strictly prohibited from
-					uploading company data or other banned files.
-				</p>
-			</Dragger>
-			{data?.map((item, index) => (
-				<div
-					key={index}
-					dangerouslySetInnerHTML={{
-						__html: item?.hocr || "",
-					}}
-				/>
-			))}
+			<div className="max-w-xl my-5 mx-auto w-[90vw]">
+				<Dragger {...props}>
+					<p className="ant-upload-drag-icon text-6xl text-slate-500 flex flex-row items-center justify-center pt-3">
+						<TbDragDrop />
+					</p>
+					<p className="ant-upload-text font-bold">
+						Click or drag file to this area to upload
+					</p>
+					<p className="ant-upload-hint font-semibold text-slate-700 max-w-sm mx-auto">
+						Support for a single or bulk upload. Strictly prohibited from
+						uploading company data or other banned files.
+					</p>
+				</Dragger>
+			</div>
+			{!!data?.length || totalLoading > 0 ? (
+				<div className="max-w-[95vw] mx-auto">
+					{!!data?.length && <Collapse items={data} />}
+					{totalLoading > 0 &&
+						Array.from({ length: totalLoading }, (_, index) => (
+							<Skeleton
+								key={index}
+								active
+								className="my-3"
+							/>
+						))}
+				</div>
+			) : (
+				<></>
+			)}
 		</>
 	);
 };
